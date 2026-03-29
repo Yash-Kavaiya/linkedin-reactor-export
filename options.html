@@ -1,0 +1,195 @@
+<!DOCTYPE html>
+<html>
+<head>
+  <meta charset="UTF-8">
+  <title>LinkedIn Reactor Exporter Pro - Settings</title>
+  <style>
+    * { box-sizing: border-box; margin: 0; padding: 0; }
+    body {
+      font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif;
+      background: #f3f2ef;
+      min-height: 100vh;
+      color: #1d2226;
+    }
+    .header {
+      background: linear-gradient(135deg, #0a66c2, #0077b5);
+      padding: 20px 32px;
+      color: white;
+    }
+    .header h1 { font-size: 20px; font-weight: 700; }
+    .header p { font-size: 13px; opacity: 0.85; margin-top: 4px; }
+    .content { max-width: 560px; margin: 24px auto; padding: 0 16px; }
+    .card {
+      background: white;
+      border-radius: 12px;
+      padding: 20px;
+      margin-bottom: 16px;
+      box-shadow: 0 1px 6px rgba(0,0,0,0.08);
+    }
+    .card-title {
+      font-size: 14px;
+      font-weight: 700;
+      color: #0a66c2;
+      margin-bottom: 16px;
+      padding-bottom: 10px;
+      border-bottom: 1px solid #f0f0f0;
+    }
+    .setting-row {
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      padding: 10px 0;
+      border-bottom: 1px solid #f8f8f8;
+    }
+    .setting-row:last-child { border-bottom: none; }
+    .setting-info label { font-size: 14px; font-weight: 600; display: block; margin-bottom: 2px; }
+    .setting-info span { font-size: 12px; color: #888; }
+    .toggle {
+      position: relative; width: 44px; height: 24px; flex-shrink: 0;
+    }
+    .toggle input { opacity: 0; width: 0; height: 0; }
+    .toggle-slider {
+      position: absolute; inset: 0;
+      background: #ccc; border-radius: 24px; cursor: pointer; transition: 0.3s;
+    }
+    .toggle-slider::before {
+      content: ''; position: absolute;
+      width: 18px; height: 18px; left: 3px; bottom: 3px;
+      background: white; border-radius: 50%; transition: 0.3s;
+    }
+    .toggle input:checked + .toggle-slider { background: #0a66c2; }
+    .toggle input:checked + .toggle-slider::before { transform: translateX(20px); }
+    select {
+      padding: 6px 10px;
+      border: 1.5px solid #ddd;
+      border-radius: 6px;
+      font-size: 13px;
+      color: #333;
+      background: white;
+      cursor: pointer;
+    }
+    select:focus { outline: none; border-color: #0a66c2; }
+    .save-btn {
+      background: #0a66c2;
+      color: white;
+      border: none;
+      padding: 10px 24px;
+      border-radius: 6px;
+      font-size: 14px;
+      font-weight: 600;
+      cursor: pointer;
+      transition: background 0.2s;
+    }
+    .save-btn:hover { background: #004182; }
+    .saved-msg {
+      color: #057642;
+      font-size: 13px;
+      font-weight: 600;
+      margin-left: 12px;
+      display: none;
+    }
+    .version { text-align: center; color: #aaa; font-size: 12px; margin-top: 16px; }
+  </style>
+</head>
+<body>
+<div class="header">
+  <h1>💼 Reactor Exporter Pro — Settings</h1>
+  <p>Configure your export preferences</p>
+</div>
+
+<div class="content">
+  <div class="card">
+    <div class="card-title">⚙️ General</div>
+    <div class="setting-row">
+      <div class="setting-info">
+        <label>Auto-scroll reactors list</label>
+        <span>Automatically scroll to load all reactors</span>
+      </div>
+      <label class="toggle">
+        <input type="checkbox" id="autoScroll" checked>
+        <span class="toggle-slider"></span>
+      </label>
+    </div>
+    <div class="setting-row">
+      <div class="setting-info">
+        <label>Include commenters</label>
+        <span>Also export people who commented on the post</span>
+      </div>
+      <label class="toggle">
+        <input type="checkbox" id="includeCommenters" checked>
+        <span class="toggle-slider"></span>
+      </label>
+    </div>
+    <div class="setting-row">
+      <div class="setting-info">
+        <label>Show floating button on posts</label>
+        <span>Inject an Export button on LinkedIn posts</span>
+      </div>
+      <label class="toggle">
+        <input type="checkbox" id="showFloatingButton" checked>
+        <span class="toggle-slider"></span>
+      </label>
+    </div>
+  </div>
+
+  <div class="card">
+    <div class="card-title">📄 Export Defaults</div>
+    <div class="setting-row">
+      <div class="setting-info">
+        <label>Default export format</label>
+        <span>Choose your preferred format</span>
+      </div>
+      <select id="defaultFormat">
+        <option value="csv">CSV</option>
+        <option value="json">JSON</option>
+        <option value="both">Both</option>
+      </select>
+    </div>
+    <div class="setting-row">
+      <div class="setting-info">
+        <label>Max history items</label>
+        <span>How many exports to remember</span>
+      </div>
+      <select id="maxHistory">
+        <option value="10">10</option>
+        <option value="25">25</option>
+        <option value="50" selected>50</option>
+        <option value="100">100</option>
+      </select>
+    </div>
+  </div>
+
+  <div class="card" style="text-align:right">
+    <button class="save-btn" id="saveBtn">Save Settings</button>
+    <span class="saved-msg" id="savedMsg">✅ Saved!</span>
+  </div>
+
+  <div class="version">LinkedIn Reactor Exporter Pro v2.0.0 · Made with ❤️</div>
+</div>
+
+<script>
+  // Load current settings
+  chrome.storage.sync.get(['autoScroll','includeCommenters','showFloatingButton','defaultFormat','maxHistory'], (s) => {
+    if (s.autoScroll !== undefined) document.getElementById('autoScroll').checked = s.autoScroll;
+    if (s.includeCommenters !== undefined) document.getElementById('includeCommenters').checked = s.includeCommenters;
+    if (s.showFloatingButton !== undefined) document.getElementById('showFloatingButton').checked = s.showFloatingButton;
+    if (s.defaultFormat) document.getElementById('defaultFormat').value = s.defaultFormat;
+    if (s.maxHistory) document.getElementById('maxHistory').value = s.maxHistory;
+  });
+
+  document.getElementById('saveBtn').addEventListener('click', () => {
+    chrome.storage.sync.set({
+      autoScroll: document.getElementById('autoScroll').checked,
+      includeCommenters: document.getElementById('includeCommenters').checked,
+      showFloatingButton: document.getElementById('showFloatingButton').checked,
+      defaultFormat: document.getElementById('defaultFormat').value,
+      maxHistory: parseInt(document.getElementById('maxHistory').value)
+    }, () => {
+      const msg = document.getElementById('savedMsg');
+      msg.style.display = 'inline';
+      setTimeout(() => msg.style.display = 'none', 2000);
+    });
+  });
+</script>
+</body>
+</html>

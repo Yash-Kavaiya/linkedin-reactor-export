@@ -2,98 +2,513 @@
 <html>
 <head>
   <meta charset="UTF-8">
-  <title>LinkedIn Reactor Exporter</title>
+  <title>LinkedIn Reactor Exporter Pro</title>
   <style>
+    * { box-sizing: border-box; margin: 0; padding: 0; }
+    
     body {
-      width: 320px;
-      padding: 16px;
-      font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif;
+      width: 380px;
+      font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
       background: #f3f2ef;
-      margin: 0;
+      color: #1d2226;
     }
-    h2 {
-      color: #0a66c2;
-      margin: 0 0 8px;
-      font-size: 16px;
+
+    /* Header */
+    .header {
+      background: linear-gradient(135deg, #0a66c2, #0077b5);
+      padding: 14px 16px;
+      color: white;
       display: flex;
       align-items: center;
-      gap: 8px;
+      justify-content: space-between;
     }
-    .logo {
-      font-size: 20px;
-    }
-    p {
-      font-size: 12px;
-      color: #555;
-      margin: 0 0 12px;
-      line-height: 1.5;
-    }
-    .steps {
-      background: #fff;
-      border-radius: 8px;
-      padding: 12px;
-      margin-bottom: 12px;
-      font-size: 12px;
-      color: #333;
-      line-height: 1.8;
-    }
-    .steps b { color: #0a66c2; }
-    button {
-      width: 100%;
-      padding: 10px;
-      background: #0a66c2;
-      color: white;
+    .header-left { display: flex; align-items: center; gap: 10px; }
+    .header-icon { font-size: 22px; }
+    .header-title { font-size: 15px; font-weight: 700; }
+    .header-subtitle { font-size: 11px; opacity: 0.85; }
+    .header-actions { display: flex; gap: 8px; }
+    .icon-btn {
+      background: rgba(255,255,255,0.2);
       border: none;
-      border-radius: 6px;
-      font-size: 14px;
-      font-weight: 600;
+      color: white;
+      width: 30px; height: 30px;
+      border-radius: 50%;
       cursor: pointer;
+      font-size: 14px;
+      display: flex; align-items: center; justify-content: center;
       transition: background 0.2s;
     }
-    button:hover { background: #004182; }
-    button:disabled { background: #aaa; cursor: not-allowed; }
-    #status {
-      margin-top: 10px;
-      font-size: 12px;
-      text-align: center;
-      color: #555;
-      min-height: 20px;
+    .icon-btn:hover { background: rgba(255,255,255,0.35); }
+
+    /* Tabs */
+    .tabs {
+      display: flex;
+      background: white;
+      border-bottom: 2px solid #e0e0e0;
     }
-    .success { color: #057642 !important; font-weight: 600; }
-    .error { color: #b74700 !important; }
-    .progress {
-      margin-top: 8px;
+    .tab {
+      flex: 1;
+      padding: 10px 4px;
+      text-align: center;
+      font-size: 12px;
+      font-weight: 600;
+      color: #666;
+      cursor: pointer;
+      border-bottom: 2px solid transparent;
+      margin-bottom: -2px;
+      transition: all 0.2s;
+    }
+    .tab:hover { color: #0a66c2; }
+    .tab.active { color: #0a66c2; border-bottom-color: #0a66c2; }
+    .tab-icon { font-size: 14px; display: block; }
+
+    /* Tab content */
+    .tab-content { display: none; }
+    .tab-content.active { display: block; }
+
+    /* Export Tab */
+    .section {
+      background: white;
+      margin: 8px;
+      border-radius: 10px;
+      padding: 14px;
+      box-shadow: 0 1px 4px rgba(0,0,0,0.08);
+    }
+    .section-title {
+      font-size: 12px;
+      font-weight: 700;
+      color: #666;
+      text-transform: uppercase;
+      letter-spacing: 0.5px;
+      margin-bottom: 10px;
+    }
+
+    /* Toggle options */
+    .option-row {
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      padding: 6px 0;
+      border-bottom: 1px solid #f0f0f0;
+    }
+    .option-row:last-child { border-bottom: none; }
+    .option-label { font-size: 13px; color: #333; }
+    .option-desc { font-size: 11px; color: #888; }
+
+    .toggle {
+      position: relative;
+      width: 40px; height: 22px;
+      flex-shrink: 0;
+    }
+    .toggle input { opacity: 0; width: 0; height: 0; }
+    .toggle-slider {
+      position: absolute;
+      inset: 0;
+      background: #ccc;
+      border-radius: 22px;
+      cursor: pointer;
+      transition: 0.3s;
+    }
+    .toggle-slider::before {
+      content: '';
+      position: absolute;
+      width: 16px; height: 16px;
+      left: 3px; bottom: 3px;
+      background: white;
+      border-radius: 50%;
+      transition: 0.3s;
+    }
+    .toggle input:checked + .toggle-slider { background: #0a66c2; }
+    .toggle input:checked + .toggle-slider::before { transform: translateX(18px); }
+
+    /* Format pills */
+    .format-group {
+      display: flex;
+      gap: 6px;
+      flex-wrap: wrap;
+    }
+    .format-pill {
+      padding: 5px 12px;
+      border-radius: 20px;
+      border: 1.5px solid #ddd;
+      background: white;
+      font-size: 12px;
+      font-weight: 600;
+      cursor: pointer;
+      transition: all 0.2s;
+      color: #555;
+    }
+    .format-pill:hover { border-color: #0a66c2; color: #0a66c2; }
+    .format-pill.active { background: #0a66c2; border-color: #0a66c2; color: white; }
+
+    /* Reaction filter */
+    .reaction-filters {
+      display: flex;
+      gap: 6px;
+      flex-wrap: wrap;
+    }
+    .reaction-chip {
+      padding: 4px 10px;
+      border-radius: 14px;
+      border: 1.5px solid #ddd;
+      background: white;
+      font-size: 11px;
+      cursor: pointer;
+      transition: all 0.2s;
+      color: #555;
+    }
+    .reaction-chip.active { background: #e8f0fe; border-color: #0a66c2; color: #0a66c2; }
+
+    /* Big export button */
+    .export-btn {
+      width: 100%;
+      padding: 13px;
+      background: linear-gradient(135deg, #0a66c2, #0077b5);
+      color: white;
+      border: none;
+      border-radius: 8px;
+      font-size: 15px;
+      font-weight: 700;
+      cursor: pointer;
+      transition: all 0.2s;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      gap: 8px;
+      margin: 8px;
+      width: calc(100% - 16px);
+    }
+    .export-btn:hover:not(:disabled) {
+      background: linear-gradient(135deg, #004182, #0a66c2);
+      transform: translateY(-1px);
+      box-shadow: 0 4px 12px rgba(10,102,194,0.3);
+    }
+    .export-btn:disabled { background: #b0b0b0; cursor: not-allowed; transform: none; }
+
+    /* Progress */
+    .progress-wrap {
+      margin: 0 8px 8px;
+      display: none;
+    }
+    .progress-track {
       background: #e0e0e0;
       border-radius: 4px;
       height: 6px;
       overflow: hidden;
+    }
+    .progress-fill {
+      height: 100%;
+      background: linear-gradient(90deg, #0a66c2, #00a0dc);
+      border-radius: 4px;
+      width: 0%;
+      transition: width 0.4s ease;
+    }
+    .progress-label {
+      font-size: 11px;
+      color: #666;
+      margin-top: 4px;
+      text-align: center;
+    }
+
+    /* Status */
+    .status-bar {
+      margin: 0 8px 8px;
+      padding: 8px 12px;
+      border-radius: 6px;
+      font-size: 12px;
+      font-weight: 600;
+      text-align: center;
       display: none;
     }
-    .progress-bar {
-      height: 100%;
-      background: #0a66c2;
-      width: 0%;
-      transition: width 0.3s;
-      border-radius: 4px;
+    .status-bar.success { background: #e6f4ea; color: #057642; display: block; }
+    .status-bar.error { background: #fde8e8; color: #b74700; display: block; }
+    .status-bar.info { background: #e8f0fe; color: #0a66c2; display: block; }
+
+    /* Quick action buttons */
+    .quick-actions {
+      display: flex;
+      gap: 6px;
+      margin: 0 8px 8px;
     }
+    .quick-btn {
+      flex: 1;
+      padding: 8px;
+      border: 1.5px solid #ddd;
+      background: white;
+      border-radius: 6px;
+      font-size: 12px;
+      font-weight: 600;
+      cursor: pointer;
+      transition: all 0.2s;
+      color: #555;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      gap: 4px;
+    }
+    .quick-btn:hover { border-color: #0a66c2; color: #0a66c2; background: #f0f7ff; }
+    .quick-btn:disabled { opacity: 0.4; cursor: not-allowed; }
+
+    /* ── ANALYTICS TAB ── */
+    .stats-grid {
+      display: grid;
+      grid-template-columns: 1fr 1fr;
+      gap: 8px;
+    }
+    .stat-card {
+      background: white;
+      border-radius: 8px;
+      padding: 12px;
+      text-align: center;
+      box-shadow: 0 1px 4px rgba(0,0,0,0.06);
+    }
+    .stat-number { font-size: 24px; font-weight: 800; color: #0a66c2; }
+    .stat-label { font-size: 11px; color: #888; margin-top: 2px; }
+
+    .reaction-bar-item {
+      display: flex;
+      align-items: center;
+      gap: 8px;
+      margin-bottom: 8px;
+    }
+    .reaction-emoji { font-size: 16px; width: 24px; text-align: center; }
+    .reaction-bar-wrap { flex: 1; background: #f0f0f0; border-radius: 4px; height: 8px; overflow: hidden; }
+    .reaction-bar-fill { height: 100%; background: #0a66c2; border-radius: 4px; transition: width 0.5s ease; }
+    .reaction-count { font-size: 12px; font-weight: 600; color: #555; min-width: 30px; text-align: right; }
+
+    .top-list { list-style: none; }
+    .top-list li {
+      display: flex;
+      align-items: center;
+      gap: 8px;
+      padding: 7px 0;
+      border-bottom: 1px solid #f0f0f0;
+      font-size: 12px;
+    }
+    .top-list li:last-child { border-bottom: none; }
+    .top-num { font-weight: 800; color: #0a66c2; min-width: 18px; font-size: 14px; }
+    .top-name { flex: 1; color: #1d2226; }
+    .top-link { color: #0a66c2; text-decoration: none; font-size: 11px; }
+    .top-link:hover { text-decoration: underline; }
+
+    /* ── HISTORY TAB ── */
+    .history-list { padding: 8px; }
+    .history-item {
+      background: white;
+      border-radius: 8px;
+      padding: 12px;
+      margin-bottom: 8px;
+      box-shadow: 0 1px 4px rgba(0,0,0,0.06);
+    }
+    .history-header { display: flex; justify-content: space-between; align-items: start; margin-bottom: 6px; }
+    .history-title { font-size: 12px; font-weight: 700; color: #1d2226; flex: 1; }
+    .history-date { font-size: 10px; color: #888; white-space: nowrap; margin-left: 8px; }
+    .history-meta { font-size: 11px; color: #666; margin-bottom: 8px; }
+    .history-actions { display: flex; gap: 6px; }
+    .history-btn {
+      padding: 4px 10px;
+      border-radius: 4px;
+      border: 1px solid #ddd;
+      background: white;
+      font-size: 11px;
+      cursor: pointer;
+      color: #555;
+      transition: all 0.15s;
+    }
+    .history-btn:hover { border-color: #0a66c2; color: #0a66c2; }
+    .empty-state {
+      text-align: center;
+      padding: 32px 16px;
+      color: #888;
+    }
+    .empty-state .empty-icon { font-size: 36px; margin-bottom: 8px; }
+    .empty-state p { font-size: 13px; }
+    .clear-history-btn {
+      display: block;
+      margin: 0 8px 8px;
+      width: calc(100% - 16px);
+      padding: 8px;
+      background: white;
+      border: 1.5px solid #dc3545;
+      border-radius: 6px;
+      color: #dc3545;
+      font-size: 12px;
+      font-weight: 600;
+      cursor: pointer;
+      transition: all 0.2s;
+    }
+    .clear-history-btn:hover { background: #dc3545; color: white; }
+
+    /* No results */
+    .not-linkedin {
+      padding: 24px 16px;
+      text-align: center;
+    }
+    .not-linkedin .big-icon { font-size: 42px; margin-bottom: 12px; }
+    .not-linkedin h3 { font-size: 15px; color: #333; margin-bottom: 6px; }
+    .not-linkedin p { font-size: 12px; color: #888; line-height: 1.5; }
   </style>
 </head>
 <body>
-  <h2><span class="logo">💼</span> Reactor Exporter</h2>
-  <p>Open a LinkedIn post, click the reaction count to open the reactors popup, then click Export.</p>
-  
-  <div class="steps">
-    <b>Steps:</b><br>
-    1️⃣ Open LinkedIn post<br>
-    2️⃣ Click the reaction count (e.g. "98")<br>
-    3️⃣ Wait for popup to appear<br>
-    4️⃣ Click <b>Export All Reactors</b> below
+
+<!-- HEADER -->
+<div class="header">
+  <div class="header-left">
+    <span class="header-icon">💼</span>
+    <div>
+      <div class="header-title">Reactor Exporter Pro</div>
+      <div class="header-subtitle">LinkedIn Post Analytics & Export</div>
+    </div>
+  </div>
+  <div class="header-actions">
+    <button class="icon-btn" id="optionsBtn" title="Settings">⚙️</button>
+  </div>
+</div>
+
+<!-- TABS -->
+<div class="tabs">
+  <div class="tab active" data-tab="export">
+    <span class="tab-icon">⬇️</span>Export
+  </div>
+  <div class="tab" data-tab="analytics">
+    <span class="tab-icon">📊</span>Analytics
+  </div>
+  <div class="tab" data-tab="history">
+    <span class="tab-icon">🕐</span>History
+  </div>
+</div>
+
+<!-- ═══ EXPORT TAB ═══ -->
+<div class="tab-content active" id="tab-export">
+  <div id="notLinkedIn" class="not-linkedin" style="display:none">
+    <div class="big-icon">🔗</div>
+    <h3>Open LinkedIn First</h3>
+    <p>Navigate to a LinkedIn post and open the reactions popup, then click Export.</p>
   </div>
 
-  <button id="exportBtn">⬇️ Export All Reactors</button>
-  <div class="progress"><div class="progress-bar" id="progressBar"></div></div>
-  <div id="status"></div>
+  <div id="exportUI">
+    <!-- Options -->
+    <div class="section">
+      <div class="section-title">📤 Export Options</div>
+      <div class="option-row">
+        <div>
+          <div class="option-label">Include Commenters</div>
+          <div class="option-desc">Also capture people who commented</div>
+        </div>
+        <label class="toggle">
+          <input type="checkbox" id="includeCommenters" checked>
+          <span class="toggle-slider"></span>
+        </label>
+      </div>
+      <div class="option-row">
+        <div>
+          <div class="option-label">Auto-scroll to load all</div>
+          <div class="option-desc">Scroll reactors list automatically</div>
+        </div>
+        <label class="toggle">
+          <input type="checkbox" id="autoScroll" checked>
+          <span class="toggle-slider"></span>
+        </label>
+      </div>
+    </div>
 
-  <script src="popup.js"></script>
+    <!-- Format -->
+    <div class="section">
+      <div class="section-title">📄 Export Format</div>
+      <div class="format-group">
+        <button class="format-pill active" data-format="csv">📊 CSV</button>
+        <button class="format-pill" data-format="json">{ } JSON</button>
+        <button class="format-pill" data-format="both">⚡ Both</button>
+      </div>
+    </div>
+
+    <!-- Reaction filter -->
+    <div class="section">
+      <div class="section-title">🎯 Filter by Reaction</div>
+      <div class="reaction-filters">
+        <button class="reaction-chip active" data-reaction="all">All</button>
+        <button class="reaction-chip" data-reaction="LIKE">👍 Like</button>
+        <button class="reaction-chip" data-reaction="PRAISE">👏 Celebrate</button>
+        <button class="reaction-chip" data-reaction="EMPATHY">❤️ Love</button>
+        <button class="reaction-chip" data-reaction="INTEREST">💡 Insightful</button>
+        <button class="reaction-chip" data-reaction="APPRECIATION">🙌 Support</button>
+        <button class="reaction-chip" data-reaction="ENTERTAINMENT">😄 Funny</button>
+      </div>
+    </div>
+
+    <!-- Main export button -->
+    <button class="export-btn" id="exportBtn">
+      ⬇️ Export All Reactors
+    </button>
+
+    <!-- Progress -->
+    <div class="progress-wrap" id="progressWrap">
+      <div class="progress-track"><div class="progress-fill" id="progressFill"></div></div>
+      <div class="progress-label" id="progressLabel">Preparing...</div>
+    </div>
+
+    <!-- Status -->
+    <div class="status-bar" id="statusBar"></div>
+
+    <!-- Quick actions (shown after export) -->
+    <div class="quick-actions" id="quickActions" style="display:none">
+      <button class="quick-btn" id="copyCSVBtn">📋 Copy CSV</button>
+      <button class="quick-btn" id="copyJSONBtn">📋 Copy JSON</button>
+      <button class="quick-btn" id="downloadAgainBtn">⬇️ Re-download</button>
+    </div>
+  </div>
+</div>
+
+<!-- ═══ ANALYTICS TAB ═══ -->
+<div class="tab-content" id="tab-analytics">
+  <div id="analyticsEmpty" class="empty-state">
+    <div class="empty-icon">📊</div>
+    <p>Export a post first to see analytics</p>
+  </div>
+  <div id="analyticsContent" style="display:none">
+    <div style="padding: 8px;">
+      <div class="stats-grid" style="margin-bottom: 8px;">
+        <div class="stat-card">
+          <div class="stat-number" id="statTotal">0</div>
+          <div class="stat-label">Total Reactors</div>
+        </div>
+        <div class="stat-card">
+          <div class="stat-number" id="statCommenters">0</div>
+          <div class="stat-label">Commenters</div>
+        </div>
+        <div class="stat-card">
+          <div class="stat-number" id="statUnique">0</div>
+          <div class="stat-label">Unique People</div>
+        </div>
+        <div class="stat-card">
+          <div class="stat-number" id="statWithUrl">0</div>
+          <div class="stat-label">With Profile URL</div>
+        </div>
+      </div>
+
+      <div class="section">
+        <div class="section-title">🎯 Reaction Breakdown</div>
+        <div id="reactionBars"></div>
+      </div>
+
+      <div class="section">
+        <div class="section-title">🏆 Top Reactors</div>
+        <ul class="top-list" id="topReactors"></ul>
+      </div>
+    </div>
+  </div>
+</div>
+
+<!-- ═══ HISTORY TAB ═══ -->
+<div class="tab-content" id="tab-history">
+  <div id="historyEmpty" class="empty-state">
+    <div class="empty-icon">🕐</div>
+    <p>No export history yet.<br>Export a post to see it here.</p>
+  </div>
+  <button class="clear-history-btn" id="clearHistoryBtn" style="display:none">🗑️ Clear All History</button>
+  <div class="history-list" id="historyList"></div>
+</div>
+
+<script src="popup.js"></script>
 </body>
 </html>
