@@ -1,0 +1,99 @@
+<!DOCTYPE html>
+<html>
+<head>
+  <meta charset="UTF-8">
+  <title>LinkedIn Reactor Exporter</title>
+  <style>
+    body {
+      width: 320px;
+      padding: 16px;
+      font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif;
+      background: #f3f2ef;
+      margin: 0;
+    }
+    h2 {
+      color: #0a66c2;
+      margin: 0 0 8px;
+      font-size: 16px;
+      display: flex;
+      align-items: center;
+      gap: 8px;
+    }
+    .logo {
+      font-size: 20px;
+    }
+    p {
+      font-size: 12px;
+      color: #555;
+      margin: 0 0 12px;
+      line-height: 1.5;
+    }
+    .steps {
+      background: #fff;
+      border-radius: 8px;
+      padding: 12px;
+      margin-bottom: 12px;
+      font-size: 12px;
+      color: #333;
+      line-height: 1.8;
+    }
+    .steps b { color: #0a66c2; }
+    button {
+      width: 100%;
+      padding: 10px;
+      background: #0a66c2;
+      color: white;
+      border: none;
+      border-radius: 6px;
+      font-size: 14px;
+      font-weight: 600;
+      cursor: pointer;
+      transition: background 0.2s;
+    }
+    button:hover { background: #004182; }
+    button:disabled { background: #aaa; cursor: not-allowed; }
+    #status {
+      margin-top: 10px;
+      font-size: 12px;
+      text-align: center;
+      color: #555;
+      min-height: 20px;
+    }
+    .success { color: #057642 !important; font-weight: 600; }
+    .error { color: #b74700 !important; }
+    .progress {
+      margin-top: 8px;
+      background: #e0e0e0;
+      border-radius: 4px;
+      height: 6px;
+      overflow: hidden;
+      display: none;
+    }
+    .progress-bar {
+      height: 100%;
+      background: #0a66c2;
+      width: 0%;
+      transition: width 0.3s;
+      border-radius: 4px;
+    }
+  </style>
+</head>
+<body>
+  <h2><span class="logo">💼</span> Reactor Exporter</h2>
+  <p>Open a LinkedIn post, click the reaction count to open the reactors popup, then click Export.</p>
+  
+  <div class="steps">
+    <b>Steps:</b><br>
+    1️⃣ Open LinkedIn post<br>
+    2️⃣ Click the reaction count (e.g. "98")<br>
+    3️⃣ Wait for popup to appear<br>
+    4️⃣ Click <b>Export All Reactors</b> below
+  </div>
+
+  <button id="exportBtn">⬇️ Export All Reactors</button>
+  <div class="progress"><div class="progress-bar" id="progressBar"></div></div>
+  <div id="status"></div>
+
+  <script src="popup.js"></script>
+</body>
+</html>
