@@ -1,4 +1,4 @@
-// LinkedIn Reactor Exporter Pro - Content Script
+// LinkedIn Reactor Exporter Pro - Content Script v2.1.0
 
 let settings = { showFloatingButton: true };
 
@@ -30,7 +30,6 @@ function observePosts() {
 }
 
 function injectButtons() {
-  // LinkedIn post articles
   const posts = document.querySelectorAll(
     '.feed-shared-update-v2:not([data-lre-injected]), .occludable-update:not([data-lre-injected])'
   );
@@ -39,7 +38,6 @@ function injectButtons() {
     post.setAttribute('data-lre-injected', '1');
     post.style.position = 'relative';
 
-    // Find the social action bar to position near it
     const actionBar = post.querySelector('.feed-shared-social-action-bar, .social-actions-button');
     if (!actionBar) return;
 
@@ -59,11 +57,9 @@ function injectButtons() {
       e.stopPropagation();
       e.preventDefault();
 
-      // Get post URL
       const postLink = post.querySelector('a[href*="activity"]');
       const postUrl = postLink ? postLink.href.split('?')[0] : window.location.href;
 
-      // Send message to popup to trigger export, or do it inline
       chrome.runtime.sendMessage({
         action: 'triggerExport',
         postUrl,
@@ -73,7 +69,6 @@ function injectButtons() {
       showToast('Opening exporter... click the extension icon 💼');
     });
 
-    // Insert after action bar
     actionBar.parentNode.style.position = 'relative';
     actionBar.parentNode.appendChild(btn);
   });
@@ -93,105 +88,140 @@ function showToast(msg, isError = false) {
   setTimeout(() => toast.classList.remove('show'), 3000);
 }
 
-// Main scraping function - called from popup via executeScript
-window.__lre_scrape = async function({ includeCommenters = true, autoScroll = true } = {}) {
-  try {
-    const results = {
-      reactors: [],
-      commenters: [],
-      postUrl: window.location.href,
-      postTitle: document.title
-    };
+// ── ROBUST MODAL FINDER ──
+// Finds the open reactions modal/dialog regardless of LinkedIn's current class names
+function findReactorsModal() {
+  // Priority order: most specific to most generic
+  const candidates = [
+    // Classic selectors (may still work in some regions)
+    document.querySelector('.social-details-reactors-tab-body-list'),
+    document.querySelector('.social-details-reactors-modal .scaffold-finite-scroll__content'),
+    document.querySelector('.artdeco-modal .scaffold-finite-scroll__content'),
+    // Structural selectors (role-based, more stable)
+    document.querySelector('[role="dialog"] .scaffold-finite-scroll__content'),
+    document.querySelector('[role="dialog"] [role="list"]'),
+    document.querySelector('[role="dialog"] ul'),
+    // Broad modal content
+    document.querySelector('[role="dialog"] .artdeco-modal__content'),
+    document.querySelector('[data-test-modal]'),
+    document.querySelector('[role="dialog"]'),
+  ];
+  return candidates.find(Boolean) || null;
+}
 
-    // ── REACTORS ──
-    const reactorModal = document.querySelector(
-      '.social-details-reactors-tab-body-list, .artdeco-modal .scaffold-finite-scroll__content'
-    );
+// ── ROBUST ITEM EXTRACTOR ──
+// Finds reactor list items from a container regardless of class names
+function findReactorItems(container) {
+  if (!container) return [];
 
-    if (reactorModal && autoScroll) {
-      await autoScrollEl(reactorModal);
-    }
-
-    const reactorItems = document.querySelectorAll(
-      '.social-details-reactors-tab-body-list__list-item, .social-details-reactors-list .artdeco-list__item'
-    );
-
-    const seen = new Set();
-    reactorItems.forEach(el => {
-      const person = extractPerson(el);
-      if (person && !seen.has(person.name)) {
-        seen.add(person.name);
-        // Try to get reaction type
-        const reactionIcon = el.querySelector('[data-reaction-type], .reactions-icon__consumption');
-        person.reactionType = reactionIcon?.getAttribute('data-reaction-type') || 
-                              reactionIcon?.getAttribute('aria-label') || 'Like';
-        results.reactors.push(person);
-      }
-    });
-
-    // ── COMMENTERS ──
-    if (includeCommenters) {
-      // Scroll comments area
-      const commentsContainer = document.querySelector(
-        '.comments-comments-list, .feed-shared-update-v2__comments-container'
-      );
-      if (commentsContainer && autoScroll) {
-        await autoScrollEl(commentsContainer);
-      }
-
-      const commentEls = document.querySelectorAll(
-        '.comments-comment-item, .comment-item'
-      );
-
-      const commentSeen = new Set();
-      commentEls.forEach(el => {
-        const person = extractPerson(el);
-        if (person && !commentSeen.has(person.name)) {
-          commentSeen.add(person.name);
-          // Get comment text
-          const commentText = el.querySelector('.comments-comment-item__main-content, .comment-content')?.innerText?.trim() || '';
-          person.commentText = commentText.slice(0, 200);
-          results.commenters.push(person);
-        }
-      });
-    }
-
-    return results;
-
-  } catch (e) {
-    return { error: e.message };
+  // Try specific selectors first
+  const specificSelectors = [
+    '.social-details-reactors-tab-body-list__list-item',
+    '.social-details-reactors-list .artdeco-list__item',
+    '.artdeco-list__item',
+  ];
+  for (const sel of specificSelectors) {
+    const items = container.querySelectorAll(sel);
+    if (items.length > 0) return Array.from(items);
   }
-};
 
+  // Role-based (stable)
+  const roleItems = container.querySelectorAll('[role="listitem"]');
+  if (roleItems.length > 0) return Array.from(roleItems);
+
+  // li elements containing a LinkedIn profile link
+  const liItems = Array.from(container.querySelectorAll('li')).filter(li =>
+    li.querySelector('a[href*="linkedin.com/in/"], a[href*="linkedin.com/company/"]')
+  );
+  if (liItems.length > 0) return liItems;
+
+  // Last resort: group by parent element around profile links
+  const seen = new Set();
+  const items = [];
+  container.querySelectorAll('a[href*="linkedin.com/in/"], a[href*="linkedin.com/company/"]').forEach(link => {
+    // Walk up to find a reasonable container (li, or an element with data-urn, or 3 levels up)
+    let el = link.closest('li') ||
+             link.closest('[data-urn]') ||
+             link.parentElement?.parentElement?.parentElement;
+    if (el && !seen.has(el)) {
+      seen.add(el);
+      items.push(el);
+    }
+  });
+  return items;
+}
+
+// ── PERSON EXTRACTOR ──
 function extractPerson(el) {
   const nameSelectors = [
+    // Specific selectors
     '.artdeco-entity-lockup__title span[aria-hidden="true"]',
     '.artdeco-entity-lockup__title',
     '.comments-post-meta__name-text',
-    '.update-components-actor__name span[aria-hidden="true"]'
+    '.update-components-actor__name span[aria-hidden="true"]',
+    // LinkedIn anonymization attributes (stable across redesigns)
+    '[data-anonymize="person-name"]',
+    '[data-anonymize="name"]',
+    // Common patterns
+    '.hoverable-link-text',
+    // Broad: any span with aria-hidden inside (LinkedIn pattern for screen-reader duplicates)
+    'span[aria-hidden="true"]',
   ];
+
   let name = '';
   for (const sel of nameSelectors) {
-    name = el.querySelector(sel)?.innerText?.trim();
-    if (name) break;
+    const found = el.querySelector(sel);
+    const text = found?.innerText?.trim();
+    if (text && text.length > 1) { name = text; break; }
   }
+
+  // Last resort: extract from profile link text or aria-label
+  if (!name) {
+    const profileLink = el.querySelector('a[href*="linkedin.com/in/"], a[href*="linkedin.com/company/"]');
+    name = profileLink?.innerText?.trim() ||
+           profileLink?.getAttribute('aria-label')?.replace(/^View /, '') || '';
+  }
+
   if (!name) return null;
 
+  // Profile URL
   let profileUrl = '';
-  const links = el.querySelectorAll('a[href]');
-  for (const link of links) {
-    const href = link.href;
+  for (const link of el.querySelectorAll('a[href]')) {
+    const href = link.href || '';
     if (href.includes('linkedin.com/in/') || href.includes('linkedin.com/company/')) {
       profileUrl = href.split('?')[0];
       break;
     }
   }
 
-  const headline = el.querySelector(
-    '.artdeco-entity-lockup__subtitle, .comments-post-meta__headline, .update-components-actor__description'
-  )?.innerText?.trim() || '';
+  // Headline
+  const headlineSelectors = [
+    '.artdeco-entity-lockup__subtitle',
+    '.comments-post-meta__headline',
+    '.update-components-actor__description',
+    '[data-anonymize="headline"]',
+    '[data-anonymize="person-headline"]',
+  ];
+  let headline = '';
+  for (const sel of headlineSelectors) {
+    const text = el.querySelector(sel)?.innerText?.trim();
+    if (text) { headline = text; break; }
+  }
 
   return { name, profileUrl, headline };
+}
+
+// ── REACTION TYPE EXTRACTOR ──
+function extractReactionType(el) {
+  const reactionEl = el.querySelector(
+    '[data-reaction-type], .reactions-icon__consumption, [aria-label*="reaction"], [class*="reaction"]'
+  );
+  if (!reactionEl) return 'LIKE';
+
+  return reactionEl.getAttribute('data-reaction-type') ||
+         reactionEl.getAttribute('aria-label') ||
+         reactionEl.className.match(/reaction[_-](\w+)/i)?.[1]?.toUpperCase() ||
+         'LIKE';
 }
 
 async function autoScrollEl(el) {
@@ -210,6 +240,98 @@ async function autoScrollEl(el) {
     setTimeout(() => { clearInterval(iv); resolve(); }, 20000);
   });
 }
+
+// ── MAIN SCRAPING FUNCTION ──
+window.__lre_scrape = async function({ includeCommenters = true, autoScroll = true } = {}) {
+  try {
+    const results = {
+      reactors: [],
+      commenters: [],
+      postUrl: window.location.href,
+      postTitle: document.title
+    };
+
+    // ── REACTORS ──
+    const reactorModal = findReactorsModal();
+
+    if (!reactorModal) {
+      return { error: 'Reactions popup not found. Please click the reaction count on a LinkedIn post to open the popup first, then try again.' };
+    }
+
+    if (autoScroll) {
+      await autoScrollEl(reactorModal);
+    }
+
+    const reactorItems = findReactorItems(reactorModal);
+    const seen = new Set();
+
+    reactorItems.forEach(el => {
+      const person = extractPerson(el);
+      if (person && !seen.has(person.name)) {
+        seen.add(person.name);
+        person.reactionType = extractReactionType(el);
+        results.reactors.push(person);
+      }
+    });
+
+    // ── COMMENTERS ──
+    if (includeCommenters) {
+      const commentContainerSelectors = [
+        '.comments-comments-list',
+        '.feed-shared-update-v2__comments-container',
+        '.comments-container',
+        '[data-test-id="comments-container"]',
+      ];
+      let commentsContainer = null;
+      for (const sel of commentContainerSelectors) {
+        commentsContainer = document.querySelector(sel);
+        if (commentsContainer) break;
+      }
+
+      if (commentsContainer && autoScroll) {
+        await autoScrollEl(commentsContainer);
+      }
+
+      const commentItemSelectors = [
+        '.comments-comment-item',
+        '.comment-item',
+        '.comments-comment-list__item',
+        '[data-urn*="comment"]',
+      ];
+      let commentEls = [];
+      for (const sel of commentItemSelectors) {
+        const found = document.querySelectorAll(sel);
+        if (found.length > 0) { commentEls = Array.from(found); break; }
+      }
+
+      const commentSeen = new Set();
+      commentEls.forEach(el => {
+        const person = extractPerson(el);
+        if (person && !commentSeen.has(person.name)) {
+          commentSeen.add(person.name);
+          const commentTextSelectors = [
+            '.comments-comment-item__main-content',
+            '.comment-content',
+            '.comments-comment-item-content-body',
+            '[data-test-id="comment-content"]',
+          ];
+          let commentText = '';
+          for (const sel of commentTextSelectors) {
+            commentText = el.querySelector(sel)?.innerText?.trim() || '';
+            if (commentText) break;
+          }
+          person.commentText = commentText.slice(0, 200);
+          results.commenters.push(person);
+        }
+      });
+    }
+
+    return results;
+
+  } catch (e) {
+    return { error: e.message };
+  }
+};
 
 // Listen from popup
 chrome.runtime.onMessage.addListener((req, sender, sendResponse) => {

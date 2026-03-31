@@ -114,12 +114,8 @@ async function runExport() {
         if (typeof window.__lre_scrape === 'function') {
           return await window.__lre_scrape(options);
         }
-        // Fallback inline scraper
+        // Fallback inline scraper (robust — mirrors content.js v2.1.0 logic)
         return await (async function({ includeCommenters, autoScroll }) {
-          const seen = new Set();
-          const reactors = [];
-          const commenters = [];
-
           async function autoScrollEl(el) {
             return new Promise(resolve => {
               let lastH = 0, stalls = 0;
@@ -134,11 +130,55 @@ async function runExport() {
             });
           }
 
+          function findReactorsModal() {
+            return document.querySelector('.social-details-reactors-tab-body-list') ||
+                   document.querySelector('.social-details-reactors-modal .scaffold-finite-scroll__content') ||
+                   document.querySelector('.artdeco-modal .scaffold-finite-scroll__content') ||
+                   document.querySelector('[role="dialog"] .scaffold-finite-scroll__content') ||
+                   document.querySelector('[role="dialog"] [role="list"]') ||
+                   document.querySelector('[role="dialog"] ul') ||
+                   document.querySelector('[role="dialog"] .artdeco-modal__content') ||
+                   document.querySelector('[data-test-modal]') ||
+                   document.querySelector('[role="dialog"]');
+          }
+
+          function findReactorItems(container) {
+            if (!container) return [];
+            for (const sel of ['.social-details-reactors-tab-body-list__list-item', '.social-details-reactors-list .artdeco-list__item', '.artdeco-list__item']) {
+              const items = container.querySelectorAll(sel);
+              if (items.length > 0) return Array.from(items);
+            }
+            const roleItems = container.querySelectorAll('[role="listitem"]');
+            if (roleItems.length > 0) return Array.from(roleItems);
+            const liItems = Array.from(container.querySelectorAll('li')).filter(li =>
+              li.querySelector('a[href*="linkedin.com/in/"], a[href*="linkedin.com/company/"]')
+            );
+            if (liItems.length > 0) return liItems;
+            const seenEls = new Set(); const items = [];
+            container.querySelectorAll('a[href*="linkedin.com/in/"], a[href*="linkedin.com/company/"]').forEach(link => {
+              let el = link.closest('li') || link.closest('[data-urn]') || link.parentElement?.parentElement?.parentElement;
+              if (el && !seenEls.has(el)) { seenEls.add(el); items.push(el); }
+            });
+            return items;
+          }
+
           function extractPerson(el) {
             let name = '';
-            for (const sel of ['.artdeco-entity-lockup__title span[aria-hidden="true"]', '.artdeco-entity-lockup__title', '.comments-post-meta__name-text']) {
-              name = el.querySelector(sel)?.innerText?.trim();
-              if (name) break;
+            for (const sel of [
+              '.artdeco-entity-lockup__title span[aria-hidden="true"]',
+              '.artdeco-entity-lockup__title',
+              '.comments-post-meta__name-text',
+              '[data-anonymize="person-name"]',
+              '[data-anonymize="name"]',
+              '.hoverable-link-text',
+              'span[aria-hidden="true"]'
+            ]) {
+              const text = el.querySelector(sel)?.innerText?.trim();
+              if (text && text.length > 1) { name = text; break; }
+            }
+            if (!name) {
+              const pl = el.querySelector('a[href*="linkedin.com/in/"], a[href*="linkedin.com/company/"]');
+              name = pl?.innerText?.trim() || pl?.getAttribute('aria-label')?.replace(/^View /, '') || '';
             }
             if (!name) return null;
             let profileUrl = '';
@@ -147,34 +187,60 @@ async function runExport() {
                 profileUrl = link.href.split('?')[0]; break;
               }
             }
-            const headline = el.querySelector('.artdeco-entity-lockup__subtitle, .comments-post-meta__headline')?.innerText?.trim() || '';
+            let headline = '';
+            for (const sel of ['.artdeco-entity-lockup__subtitle', '.comments-post-meta__headline', '[data-anonymize="headline"]', '[data-anonymize="person-headline"]']) {
+              const text = el.querySelector(sel)?.innerText?.trim();
+              if (text) { headline = text; break; }
+            }
             return { name, profileUrl, headline };
           }
 
-          // Reactors
-          const reactorModal = document.querySelector('.social-details-reactors-tab-body-list, .artdeco-modal .scaffold-finite-scroll__content');
-          if (reactorModal && autoScroll) await autoScrollEl(reactorModal);
+          function extractReactionType(el) {
+            const re = el.querySelector('[data-reaction-type], .reactions-icon__consumption, [aria-label*="reaction"], [class*="reaction"]');
+            if (!re) return 'LIKE';
+            return re.getAttribute('data-reaction-type') || re.getAttribute('aria-label') ||
+                   (re.className.match(/reaction[_-](\w+)/i) || [])[1]?.toUpperCase() || 'LIKE';
+          }
 
-          document.querySelectorAll('.social-details-reactors-tab-body-list__list-item, .social-details-reactors-list .artdeco-list__item').forEach(el => {
+          const reactorModal = findReactorsModal();
+          if (!reactorModal) return { error: 'Reactions popup not found. Please click the reaction count on the post to open the popup first.' };
+          if (autoScroll) await autoScrollEl(reactorModal);
+
+          const seen = new Set();
+          const reactors = [];
+          findReactorItems(reactorModal).forEach(el => {
             const p = extractPerson(el);
             if (p && !seen.has(p.name)) {
               seen.add(p.name);
-              const ri = el.querySelector('[data-reaction-type]');
-              p.reactionType = ri?.getAttribute('data-reaction-type') || 'LIKE';
+              p.reactionType = extractReactionType(el);
               reactors.push(p);
             }
           });
 
-          // Commenters
+          const commenters = [];
           if (includeCommenters) {
-            const cc = document.querySelector('.comments-comments-list');
+            let cc = null;
+            for (const sel of ['.comments-comments-list', '.feed-shared-update-v2__comments-container', '.comments-container', '[data-test-id="comments-container"]']) {
+              cc = document.querySelector(sel);
+              if (cc) break;
+            }
             if (cc && autoScroll) await autoScrollEl(cc);
+            let commentEls = [];
+            for (const sel of ['.comments-comment-item', '.comment-item', '.comments-comment-list__item', '[data-urn*="comment"]']) {
+              const found = document.querySelectorAll(sel);
+              if (found.length > 0) { commentEls = Array.from(found); break; }
+            }
             const cs = new Set();
-            document.querySelectorAll('.comments-comment-item, .comment-item').forEach(el => {
+            commentEls.forEach(el => {
               const p = extractPerson(el);
               if (p && !cs.has(p.name)) {
                 cs.add(p.name);
-                p.commentText = el.querySelector('.comments-comment-item__main-content')?.innerText?.trim()?.slice(0, 200) || '';
+                let ct = '';
+                for (const sel of ['.comments-comment-item__main-content', '.comment-content', '.comments-comment-item-content-body']) {
+                  ct = el.querySelector(sel)?.innerText?.trim() || '';
+                  if (ct) break;
+                }
+                p.commentText = ct.slice(0, 200);
                 commenters.push(p);
               }
             });
@@ -198,7 +264,7 @@ async function runExport() {
     }
 
     if (reactors.length === 0 && (data.commenters || []).length === 0) {
-      throw new Error('No reactors found. Open the reactions popup first, then click Export.');
+      throw new Error('No reactors found. Make sure you clicked the reaction count (e.g. "98 reactions") on the post to open the reactions popup, then try again. If this persists, LinkedIn may have updated their layout — please report it at github.com/Yash-Kavaiya/linkedin-reactor-export/issues');
     }
 
     setProgress(85, 'Building export files...');
