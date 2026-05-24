@@ -117,16 +117,28 @@ async function runExport() {
         // Fallback inline scraper (robust — mirrors content.js v2.1.0 logic)
         return await (async function({ includeCommenters, autoScroll }) {
           async function autoScrollEl(el) {
+            function findScrollable(node) {
+              let cur = node;
+              for (let i = 0; i < 6; i++) {
+                if (cur.scrollHeight > cur.clientHeight + 10) return cur;
+                if (!cur.parentElement) break;
+                cur = cur.parentElement;
+              }
+              return node;
+            }
+            const scrollEl = findScrollable(el);
             return new Promise(resolve => {
               let lastH = 0, stalls = 0;
+              const MAX_STALLS = 12;
               const iv = setInterval(() => {
-                el.scrollTop += 600;
-                if (el.scrollHeight === lastH) {
+                scrollEl.scrollTop += 400;
+                const curH = scrollEl.scrollHeight;
+                if (curH === lastH) {
                   stalls++;
-                  if (stalls >= 4) { clearInterval(iv); resolve(); }
-                } else { stalls = 0; lastH = el.scrollHeight; }
-              }, 350);
-              setTimeout(() => { clearInterval(iv); resolve(); }, 20000);
+                  if (stalls >= MAX_STALLS) { clearInterval(iv); resolve(); }
+                } else { stalls = 0; lastH = curH; }
+              }, 400);
+              setTimeout(() => { clearInterval(iv); resolve(); }, 45000);
             });
           }
 
